@@ -21,7 +21,10 @@ except Exception as e:
 # ----------------------
 # Config from environment
 # ----------------------
-URL = os.getenv("TARGETS_URL", "https://witha.name/data/last.json")
+URL = os.getenv("TARGETS_URL")
+if not URL:
+    print("ERROR: Set TARGETS_URL in environment file", file=sys.stderr)
+    sys.exit(2)
 
 STATE_FILE = Path(os.getenv("STATE_FILE", str(Path(__file__).with_name("seen.json"))))
 
@@ -96,10 +99,26 @@ def host_matches(monitored: List[str], host: str) -> bool:
 
 
 def fetch_targets(url: str) -> List[Dict[str, Any]]:
-    r = requests.get(url, timeout=30)
-    r.raise_for_status()
-    data = r.json()
-    return data.get("targets", [])
+    try:
+        r = requests.get(url, timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        return data.get("targets", [])
+    except requests.RequestException as e:
+        error_msg = f"Failed to fetch targets from {url}: {str(e)}"
+        print(f"ERROR: {error_msg}", file=sys.stderr)
+        # Try to notify via Slack about the error
+        if SLACK_WEBHOOK:
+            try:
+                text = (
+                    ":warning: Target Watcher Error :warning:\n\n"
+                    f"*{SLACK_TITLE}*: {error_msg}\n"
+                    f"_host: {socket.gethostname()}_"
+                )
+                requests.post(SLACK_WEBHOOK, json={"text": text}, timeout=15)
+            except Exception as slack_e:
+                print(f"ERROR: Failed to send error notification to Slack: {slack_e}", file=sys.stderr)
+        raise  # Re-raise the original exception
 
 
 def format_hits(hits: List[Dict[str, Any]]) -> str:

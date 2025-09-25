@@ -1,0 +1,15 @@
+[Unit]
+Description=Target Host Monitoring Service
+After=network.target
+
+[Service]
+Type=simple
+User=nobody
+Group=nobody
+WorkingDirectory=/opt/target_watcher
+ExecStart=/usr/bin/python3 /opt/target_watcher/target_watcher.py
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target
